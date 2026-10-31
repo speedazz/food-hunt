@@ -1,0 +1,38 @@
+[
+  {
+    "id": "p1", "name": "Tian Tian Hainanese Chicken Rice", "area": "Chinatown", "cuisine": "Chicken rice",
+    "price": 5.5, "rating": 4.5, "dish": "Hainanese chicken rice",
+    "notes": "SAMPLE DATA - Maxwell Food Centre. Expect a queue at lunch. Check price.",
+    "photo": "", "lat": 1.2803, "lng": 103.8447, "status": "want"
+  },
+  {
+    "id": "p2", "name": "Old Airport Road Food Centre", "area": "Geylang", "cuisine": "Hawker centre",
+    "price": 4, "rating": 4.5, "dish": "Lor mee, Nasi lemak",
+    "notes": "SAMPLE DATA - Big hawker centre, many famous stalls. Check price.",
+    "photo": "", "lat": 1.3081, "lng": 103.8856, "status": "want"
+  },
+  {
+    "id": "p3", "name": "Tiong Bahru Market", "area": "Tiong Bahru", "cuisine": "Hawker centre",
+    "price": 6, "rating": 4.4, "dish": "Chwee kueh",
+    "notes": "SAMPLE DATA - Good for breakfast. Check price.",
+    "photo": "", "lat": 1.2846, "lng": 103.8327, "status": "visited"
+  },
+  {
+    "id": "p4", "name": "Lau Pa Sat", "area": "Raffles Place", "cuisine": "Satay / hawker",
+    "price": 15, "rating": 4.0, "dish": "Satay (night street)",
+    "notes": "SAMPLE DATA - Touristy but convenient. Check price.",
+    "photo": "", "lat": 1.2806, "lng": 103.8503, "status": "want"
+  },
+  {
+    "id": "p5", "name": "Sample Restaurant", "area": "Orchard", "cuisine": "Modern Asian",
+    "price": 35, "rating": 4.2, "dish": "Chef's set",
+    "notes": "SAMPLE DATA - Replace me with a real place.",
+    "photo": "", "lat": 1.3048, "lng": 103.8318, "status": "want"
+  },
+  {
+    "id": "p6", "name": "Sample Fine Dining", "area": "Marina Bay", "cuisine": "Fine dining",
+    "price": 120, "rating": 4.8, "dish": "Tasting menu",
+    "notes": "SAMPLE DATA - Replace me with a real place.",
+    "photo": "", "lat": 1.2834, "lng": 103.8607, "status": "want"
+  }
+]

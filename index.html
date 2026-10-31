@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Food Hunt SG</title>
+  <meta name="theme-color" content="#d9480f">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Food Hunt SG</h1>
+    <div class="tabs">
+      <button id="tab-list" class="active">List</button>
+      <button id="tab-map">Map</button>
+    </div>
+  </header>
+
+  <section class="filters">
+    <input id="q" type="search" placeholder="Search name, dish, notes…">
+    <select id="f-tier"></select>
+    <select id="f-area"></select>
+    <select id="f-status">
+      <option value="">All status</option>
+      <option value="want">Want to try</option>
+      <option value="visited">Visited</option>
+    </select>
+    <select id="f-sort">
+      <option value="tier">Sort: price tier</option>
+      <option value="price">Sort: price</option>
+      <option value="rating">Sort: rating</option>
+      <option value="name">Sort: name</option>
+    </select>
+  </section>
+
+  <p id="count" class="count"></p>
+
+  <main>
+    <div id="list"></div>
+    <div id="map" hidden></div>
+  </main>
+
+  <div class="actions">
+    <button id="btn-add">+ Add place</button>
+    <button id="btn-export">Export my changes</button>
+    <button id="btn-reset" class="ghost">Clear local changes</button>
+  </div>
+
+  <dialog id="dlg">
+    <form id="form" method="dialog">
+      <h2>Add place</h2>
+      <label>Name <input name="name" required></label>
+      <label>Area <input name="area" list="areas" placeholder="e.g. Chinatown" required></label>
+      <datalist id="areas"></datalist>
+      <label>Cuisine / type <input name="cuisine" placeholder="e.g. Chicken rice"></label>
+      <label>Price per pax (S$) <input name="price" type="number" min="0" step="0.5" required></label>
+      <label>Must-try dish <input name="dish"></label>
+      <label>Notes <textarea name="notes" rows="2"></textarea></label>
+      <label>Photo path <input name="photo" placeholder="photos/my-photo.jpg"></label>
+      <label>Latitude <input name="lat" type="number" step="any" placeholder="1.2803"></label>
+      <label>Longitude <input name="lng" type="number" step="any" placeholder="103.8447"></label>
+      <div class="row">
+        <button value="cancel" class="ghost" formnovalidate>Cancel</button>
+        <button id="save" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
