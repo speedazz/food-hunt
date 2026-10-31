@@ -16,7 +16,9 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 let base = [];
 let statusMap = load(LS_STATUS, {});
 let added = load(LS_ADDED, []);
-let map, markers;
+// Restricted to https://speedazz.github.io/* in Google Cloud; safe to be public.
+const GMAPS_KEY = 'AIzaSyCULEXVVdkt1q6CPwBbrx0efD0VHOS6SE0';
+let map, info, markers = [], gmapsPromise;
 
 const $ = id => document.getElementById(id);
 const all = () => [...base, ...added].map(p => ({ ...p, status: statusMap[p.id] || p.status || 'want' }));
@@ -81,34 +83,63 @@ function render() {
   renderMarkers(items);
 }
 
+function loadGMaps() {
+  gmapsPromise ??= new Promise((resolve, reject) => {
+    window.__gmapsInit = resolve;
+    window.gm_authFailure = () => { gmapsPromise = null; $('map-msg').textContent = 'Google rejected the API key. Check its website restriction.'; };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GMAPS_KEY}&loading=async&callback=__gmapsInit&v=weekly`;
+    s.onerror = () => { gmapsPromise = null; reject(new Error('Google Maps failed to load')); };
+    document.head.append(s);
+  });
+  return gmapsPromise;
+}
+
+// Counts as one billable map load, so it only runs when you tap "Load map".
+async function startMap() {
+  $('btn-loadmap').disabled = true;
+  $('map-msg').textContent = 'Loading map…';
+  try {
+    await loadGMaps();
+    const { Map, InfoWindow } = await google.maps.importLibrary('maps');
+    await google.maps.importLibrary('marker');
+    map = new Map($('gmap'), { center: { lat: 1.3521, lng: 103.8198 }, zoom: 12, streetViewControl: false, mapTypeControl: false });
+    info = new InfoWindow();
+    $('map-start').hidden = true;
+    renderMarkers(filtered());
+  } catch (err) {
+    $('map-msg').textContent = 'Could not load Google Maps. Try again.';
+    $('btn-loadmap').disabled = false;
+  }
+}
+
 function renderMarkers(items) {
   if (!map) return;
-  markers.clearLayers();
-  const pts = [];
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+  const bounds = new google.maps.LatLngBounds();
   items.filter(p => p.lat && p.lng).forEach(p => {
     const t = tierOf(p);
-    L.marker([p.lat, p.lng]).addTo(markers)
-      .bindPopup(`<b>${esc(p.name)}</b><br>${t.label} · S$${Number(p.price).toFixed(2)}<br>${esc(p.area)}`);
-    pts.push([p.lat, p.lng]);
+    const m = new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map, title: p.name });
+    m.addListener('click', () => {
+      info.setContent(`<div style="color:#222"><b>${esc(p.name)}</b><br>${t.label} · S$${Number(p.price).toFixed(2)}<br>${esc(p.area)}<br>` +
+        `<a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">Open in Google Maps</a></div>`);
+      info.open({ map, anchor: m });
+    });
+    markers.push(m);
+    bounds.extend(m.getPosition());
   });
-  if (pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
+  if (markers.length) {
+    map.fitBounds(bounds, 40);
+    google.maps.event.addListenerOnce(map, 'idle', () => { if (map.getZoom() > 16) map.setZoom(16); });
+  }
 }
 
 function showTab(which) {
   const isMap = which === 'map';
-  $('list').hidden = isMap; $('map').hidden = !isMap;
+  $('list').hidden = isMap; $('map-wrap').hidden = !isMap;
   $('tab-list').classList.toggle('active', !isMap);
   $('tab-map').classList.toggle('active', isMap);
-  if (isMap) {
-    if (!map) {
-      map = L.map('map').setView([1.3521, 103.8198], 12);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-      markers = L.layerGroup().addTo(map);
-    }
-    map.invalidateSize();
-    renderMarkers(filtered());
-  }
 }
 
 async function init() {
@@ -118,6 +149,7 @@ async function init() {
   ['q', 'f-tier', 'f-area', 'f-status', 'f-sort'].forEach(id => $(id).addEventListener('input', render));
   $('tab-list').onclick = () => showTab('list');
   $('tab-map').onclick = () => showTab('map');
+  $('btn-loadmap').onclick = startMap;
 
   $('list').addEventListener('click', e => {
     const b = e.target.closest('button.status');

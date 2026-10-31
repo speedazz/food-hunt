@@ -7,7 +7,6 @@
   <meta name="theme-color" content="#d9480f">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -40,7 +39,13 @@
 
   <main>
     <div id="list"></div>
-    <div id="map" hidden></div>
+    <div id="map-wrap" hidden>
+      <div id="map-start">
+        <button id="btn-loadmap">Load map</button>
+        <p id="map-msg" class="meta">Loads Google Maps only when you tap, to keep usage within the free limit.</p>
+      </div>
+      <div id="gmap"></div>
+    </div>
   </main>
 
   <div class="actions">
@@ -69,7 +74,6 @@
     </form>
   </dialog>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
