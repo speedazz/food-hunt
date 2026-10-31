@@ -151,6 +151,15 @@ async function init() {
   $('tab-map').onclick = () => showTab('map');
   $('btn-loadmap').onclick = startMap;
 
+  const root = document.documentElement;
+  const syncThemeBtn = () => { $('btn-theme').textContent = root.dataset.theme === 'playful' ? 'Minimal' : 'Playful'; };
+  syncThemeBtn();
+  $('btn-theme').onclick = () => {
+    root.dataset.theme = root.dataset.theme === 'playful' ? 'minimal' : 'playful';
+    try { localStorage.setItem('fh_theme', root.dataset.theme); } catch {}
+    syncThemeBtn();
+  };
+
   $('list').addEventListener('click', e => {
     const b = e.target.closest('button.status');
     if (!b) return;

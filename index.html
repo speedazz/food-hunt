@@ -7,14 +7,18 @@
   <meta name="theme-color" content="#d9480f">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('fh_theme') || 'minimal'; } catch (e) { document.documentElement.dataset.theme = 'minimal'; }</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
     <h1>Food Hunt SG</h1>
-    <div class="tabs">
-      <button id="tab-list" class="active">List</button>
-      <button id="tab-map">Map</button>
+    <div class="hdr-right">
+      <button id="btn-theme" title="Switch theme">Playful</button>
+      <div class="tabs">
+        <button id="tab-list" class="active">List</button>
+        <button id="tab-map">Map</button>
+      </div>
     </div>
   </header>
 
