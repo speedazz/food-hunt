@@ -82,6 +82,14 @@ main { padding: 12px 16px; max-width: 900px; margin: 0 auto; }
 .card .foot { display: flex; gap: 10px; margin-top: 4px; align-items: center; }
 .card .foot a { color: var(--muted); font-size: .85rem; }
 
+.rbox { margin: 0 16px 4px; max-width: 900px; }
+.rbox summary, .research summary { cursor: pointer; font-size: .85rem; color: var(--muted); }
+.rbox form { display: flex; gap: 8px; margin-top: 8px; }
+.rlinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rlinks a { font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--text); text-decoration: none; background: var(--card); }
+.rlinks a:hover { border-color: var(--accent); color: var(--accent); }
+@media (min-width: 932px) { .rbox { margin-left: auto; margin-right: auto; } }
+
 button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; }
 :root[data-theme="playful"] button { font-weight: 700; }
 button.ghost { background: transparent; color: var(--text); border-color: var(--line); }

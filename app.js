@@ -9,6 +9,9 @@ const TIERS = [
 const tierOf = p => TIERS.find(t => p.price < t.max);
 const tierIndex = p => TIERS.indexOf(tierOf(p));
 
+// Paste the Google Sheet "Publish to web" CSV link here. While it is empty (or fails), places.json is used.
+const SHEET_CSV_URL = '';
+
 const LS_STATUS = 'fh_status', LS_ADDED = 'fh_added';
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -55,6 +58,67 @@ function filtered() {
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+function parseCSV(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function rowsToPlaces(rows) {
+  const [head, ...body] = rows;
+  const keys = head.map(h => h.trim().toLowerCase());
+  return body.map((r, i) => {
+    const o = Object.fromEntries(keys.map((k, j) => [k, (r[j] ?? '').trim()]));
+    return {
+      id: o.id || 's' + (i + 1), name: o.name, area: o.area || 'Other', cuisine: o.cuisine,
+      price: Number(o.price) || 0, rating: o.rating ? Number(o.rating) : null,
+      dish: o.dish, notes: o.notes, photo: o.photo,
+      lat: o.lat ? Number(o.lat) : null, lng: o.lng ? Number(o.lng) : null,
+      status: o.status === 'visited' ? 'visited' : 'want',
+    };
+  }).filter(p => p.name);
+}
+
+async function loadPlaces() {
+  if (SHEET_CSV_URL) {
+    try {
+      const res = await fetch(SHEET_CSV_URL, { cache: 'no-store' });
+      if (res.ok) { const places = rowsToPlaces(parseCSV(await res.text())); if (places.length) return places; }
+    } catch {}
+  }
+  try { return await (await fetch('places.json')).json(); } catch { return []; }
+}
+
+// Search links for one place or any free-text idea. Instagram, TikTok and blogs go through Google
+// site: searches because they have no stable public search URLs of their own.
+const BLOGS = ['sethlui.com', 'ladyironchef.com', 'eatbook.sg', 'danielfooddiary.com', 'misstamchiak.com'];
+function researchLinks(q) {
+  const e = encodeURIComponent, g = s => 'https://www.google.com/search?q=' + e(s);
+  return [
+    ['Google Maps', 'https://www.google.com/maps/search/?api=1&query=' + e(q)],
+    ['Instagram', g(`site:instagram.com ${q}`)],
+    ['TikTok', 'https://www.tiktok.com/search?q=' + e(q)],
+    ['YouTube', 'https://www.youtube.com/results?search_query=' + e(q)],
+    ['Reddit', 'https://www.reddit.com/search/?q=' + e(q)],
+    ['Burpple', 'https://www.burpple.com/search/sg?q=' + e(q)],
+    ['Food blogs', g(`${q} (${BLOGS.map(b => 'site:' + b).join(' OR ')})`)],
+    ['Reviews', g(`${q} review`)],
+  ].map(([label, href]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`).join('');
+}
+
 function card(p) {
   const t = tierOf(p);
   const mapLink = p.lat && p.lng
@@ -73,6 +137,8 @@ function card(p) {
         <button class="status ${p.status}" data-id="${esc(p.id)}">${p.status === 'visited' ? '✓ Visited' : 'Want to try'}</button>
         ${mapLink}
       </div>
+      <details class="research"><summary>Research</summary>
+        <div class="rlinks">${researchLinks(`${p.name} ${p.area} Singapore`)}</div></details>
     </div></article>`;
 }
 
@@ -143,13 +209,19 @@ function showTab(which) {
 }
 
 async function init() {
-  try { base = await (await fetch('places.json')).json(); } catch { base = []; }
+  base = await loadPlaces();
   fillSelects();
   render();
   ['q', 'f-tier', 'f-area', 'f-status', 'f-sort'].forEach(id => $(id).addEventListener('input', render));
   $('tab-list').onclick = () => showTab('list');
   $('tab-map').onclick = () => showTab('map');
   $('btn-loadmap').onclick = startMap;
+
+  $('rform').addEventListener('submit', e => {
+    e.preventDefault();
+    const q = $('rq').value.trim();
+    $('rlinks').innerHTML = q ? researchLinks(q) : '';
+  });
 
   const root = document.documentElement;
   const syncThemeBtn = () => { $('btn-theme').textContent = root.dataset.theme === 'playful' ? 'Minimal' : 'Playful'; };
