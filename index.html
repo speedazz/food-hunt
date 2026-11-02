@@ -35,6 +35,7 @@
       <option value="tier">Sort: price tier</option>
       <option value="price">Sort: price</option>
       <option value="rating">Sort: rating</option>
+      <option value="near">Sort: nearest to me</option>
       <option value="name">Sort: name</option>
     </select>
   </section>
@@ -49,7 +50,11 @@
     <div id="found" class="found"></div>
   </details>
 
-  <p id="count" class="count"></p>
+  <div class="countrow">
+    <p id="count" class="count"></p>
+    <button id="btn-surprise" class="ghost">Surprise me</button>
+  </div>
+  <div id="spot" class="spot" hidden></div>
 
   <main>
     <div id="list"></div>

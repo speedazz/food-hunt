@@ -24,7 +24,47 @@ const GMAPS_KEY = 'AIzaSyCULEXVVdkt1q6CPwBbrx0efD0VHOS6SE0';
 let map, info, markers = [], gmapsPromise;
 
 const $ = id => document.getElementById(id);
-const all = () => [...base, ...added].map(p => ({ ...p, status: statusMap[p.id] || p.status || 'want' }));
+// Coordinates for places that have none in the sheet are looked up once per device and cached.
+const LS_COORDS = 'fh_coords';
+let coordCache = load(LS_COORDS, {}), me = null, spot = null, geoBusy = false;
+const ckey = p => (p.name + '|' + p.area).toLowerCase();
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const all = () => [...base, ...added].map(p => {
+  const c = !(p.lat && p.lng) ? coordCache[ckey(p)] : null;
+  return { ...p, lat: p.lat || c?.lat || null, lng: p.lng || c?.lng || null, status: statusMap[p.id] || p.status || 'want' };
+});
+
+function dist(p) {
+  if (!me || !p.lat || !p.lng) return null;
+  const r = Math.PI / 180, dLat = (p.lat - me.lat) * r, dLng = (p.lng - me.lng) * r;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(me.lat * r) * Math.cos(p.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+
+async function geocodeMissing(limit = 25) {
+  if (geoBusy) return;
+  geoBusy = true;
+  try {
+    const todo = all().filter(p => !(p.lat && p.lng) && !coordCache[ckey(p)]).slice(0, limit);
+    for (const p of todo) {
+      try {
+        const r = await searchPlaces(`${p.name} ${p.area} Singapore`, { mask: 'places.location', size: 1 });
+        const loc = r[0]?.location;
+        coordCache[ckey(p)] = loc ? { lat: loc.latitude, lng: loc.longitude } : { miss: true };
+      } catch { break; }
+      save(LS_COORDS, coordCache);
+    }
+  } finally { geoBusy = false; }
+}
+
+function locate() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(false);
+    navigator.geolocation.getCurrentPosition(
+      pos => { me = { lat: pos.coords.latitude, lng: pos.coords.longitude }; res(true); },
+      () => res(false), { timeout: 10000 });
+  });
+}
 
 function fillSelects() {
   const places = all();
@@ -52,6 +92,7 @@ function filtered() {
     price: (a, b) => a.price - b.price,
     rating: (a, b) => (b.rating || 0) - (a.rating || 0),
     name: (a, b) => a.name.localeCompare(b.name),
+    near: (a, b) => (dist(a) ?? 1e9) - (dist(b) ?? 1e9),
   }[sort];
   return out.sort(by);
 }
@@ -106,16 +147,16 @@ let found = [];
 
 // Google Places (New) text search, limited to Singapore. Rating and price range put this in the
 // Enterprise tier, which has a small free monthly allowance, so it only runs when you tap Search.
-async function searchPlaces(q) {
+async function searchPlaces(q, { mask, size } = {}) {
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': GMAPS_KEY,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceRange,places.priceLevel,places.primaryTypeDisplayName,places.googleMapsUri',
+      'X-Goog-FieldMask': mask || 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceRange,places.priceLevel,places.primaryTypeDisplayName,places.googleMapsUri',
     },
     body: JSON.stringify({
-      textQuery: q, regionCode: 'SG', pageSize: 10,
+      textQuery: q, regionCode: 'SG', pageSize: size || 10,
       locationRestriction: { rectangle: { low: { latitude: 1.15, longitude: 103.6 }, high: { latitude: 1.48, longitude: 104.1 } } },
     }),
   });
@@ -170,21 +211,25 @@ function researchLinks(q) {
 
 function card(p) {
   const t = tierOf(p);
-  const mapLink = p.lat && p.lng
-    ? `<a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">Open in Maps</a>` : '';
+  const q = p.lat && p.lng ? `${p.lat},${p.lng}` : encodeURIComponent(`${p.name} ${p.area} Singapore`);
+  const mapLink = `<a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Open in Maps</a>`;
+  const d = dist(p);
+  // No photo in the sheet? Try photos/<name-slug>.jpg, so a photo can be added just by uploading it to GitHub.
+  const photo = p.photo || `photos/${slug(p.name)}.jpg`;
   return `<article class="card">
-    ${p.photo ? `<img src="${esc(p.photo)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">` : ''}
+    <img src="${esc(photo)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">
     <div class="body">
       <div class="chips"><span class="chip ${t.id}">${t.label}</span>
         <span class="price">S$${Number(p.price).toFixed(2)}/pax</span>
         ${p.rating ? `<span class="meta">★ ${p.rating}</span>` : ''}</div>
       <h3>${esc(p.name)}</h3>
-      <div class="meta">${esc(p.area)}${p.cuisine ? ' · ' + esc(p.cuisine) : ''}</div>
+      <div class="meta">${esc(p.area)}${p.cuisine ? ' · ' + esc(p.cuisine) : ''}${d != null ? ' · ' + d.toFixed(1) + ' km away' : ''}</div>
       ${p.dish ? `<div class="dish">Try: ${esc(p.dish)}</div>` : ''}
       ${p.notes ? `<div class="notes">${esc(p.notes)}</div>` : ''}
       <div class="foot">
         <button class="status ${p.status}" data-id="${esc(p.id)}">${p.status === 'visited' ? '✓ Visited' : 'Want to try'}</button>
         ${mapLink}
+        <button class="status" data-share="${esc(p.id)}">Share</button>
       </div>
       <details class="research"><summary>Research</summary>
         <div class="rlinks">${researchLinks(`${p.name} ${p.area} Singapore`)}</div></details>
@@ -192,7 +237,9 @@ function card(p) {
 }
 
 function render() {
-  const items = filtered();
+  const items = spot ? all().filter(p => p.id === spot.id) : filtered();
+  $('spot').hidden = !spot;
+  if (spot) $('spot').innerHTML = `<span>${esc(spot.label)}</span>${spot.random ? '<button id="spot-again" class="ghost">Another</button>' : ''}<button id="spot-all" class="ghost">Show all</button>`;
   $('count').textContent = `${items.length} place${items.length === 1 ? '' : 's'}`;
   $('list').innerHTML = items.length ? items.map(card).join('') : '<p class="meta">No places match.</p>';
   renderMarkers(items);
@@ -222,6 +269,7 @@ async function startMap() {
     info = new InfoWindow();
     $('map-start').hidden = true;
     renderMarkers(filtered());
+    geocodeMissing().then(() => renderMarkers(filtered()));
   } catch (err) {
     $('map-msg').textContent = 'Could not load Google Maps. Try again.';
     $('btn-loadmap').disabled = false;
@@ -261,10 +309,38 @@ async function init() {
   base = await loadPlaces();
   fillSelects();
   render();
-  ['q', 'f-tier', 'f-area', 'f-status', 'f-sort'].forEach(id => $(id).addEventListener('input', render));
+  ['q', 'f-tier', 'f-area', 'f-status', 'f-sort'].forEach(id => $(id).addEventListener('input', () => { spot = null; render(); }));
   $('tab-list').onclick = () => showTab('list');
   $('tab-map').onclick = () => showTab('map');
   $('btn-loadmap').onclick = startMap;
+
+  // Nearest first: asks for your location, then looks up coordinates for places that have none.
+  $('f-sort').addEventListener('input', async () => {
+    if ($('f-sort').value !== 'near') return;
+    $('count').textContent = 'Finding your location…';
+    if (!me && !(await locate())) {
+      $('count').textContent = 'Location is blocked. Allow location for this site to sort by distance.';
+      return;
+    }
+    await geocodeMissing();
+    render();
+  });
+
+  // Surprise me picks a random place from whatever the filters currently show.
+  const surprise = () => {
+    const pool = filtered().filter(p => !spot || p.id !== spot.id);
+    if (!pool.length) return;
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    spot = { id: p.id, label: 'Try this one', random: true };
+    showTab('list'); render();
+  };
+  $('btn-surprise').onclick = surprise;
+  $('spot').addEventListener('click', e => {
+    if (e.target.id === 'spot-again') surprise();
+    if (e.target.id === 'spot-all') { spot = null; history.replaceState(null, '', location.pathname); render(); }
+  });
+  const shared = new URLSearchParams(location.search).get('p');
+  if (shared && all().some(p => p.id === shared)) { spot = { id: shared, label: 'Shared place' }; render(); }
 
   // "Search places" calls Google Places (one billable request per tap); "Research links" is free.
   $('rform').addEventListener('submit', async e => {
@@ -305,7 +381,13 @@ async function init() {
     syncThemeBtn();
   };
 
-  $('list').addEventListener('click', e => {
+  $('list').addEventListener('click', async e => {
+    const sh = e.target.closest('button[data-share]');
+    if (sh) {
+      const url = `${location.origin}${location.pathname}?p=${encodeURIComponent(sh.dataset.share)}`;
+      try { await navigator.clipboard.writeText(url); sh.textContent = 'Link copied'; } catch { sh.textContent = 'Copy failed'; }
+      return;
+    }
     const b = e.target.closest('button.status');
     if (!b) return;
     const id = b.dataset.id, cur = all().find(p => p.id === id).status;

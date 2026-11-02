@@ -55,7 +55,11 @@ h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
 .filters input { grid-column: 1 / -1; }
 input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--text); width: 100%; }
 :root[data-theme="playful"] input, :root[data-theme="playful"] select, :root[data-theme="playful"] textarea { border-width: 2px; }
-.count { margin: 0 16px; color: var(--muted); font-size: .85rem; }
+.count { margin: 0; color: var(--muted); font-size: .85rem; }
+.countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; max-width: 900px; margin: 0 auto; }
+.spot { display: flex; align-items: center; gap: 8px; padding: 8px 16px; max-width: 900px; margin: 8px auto 0; }
+.spot span { flex: 1; font-weight: 600; color: var(--accent); }
+#btn-surprise { padding: 5px 12px; font-size: .85rem; }
 
 main { padding: 12px 16px; max-width: 900px; margin: 0 auto; }
 #list { display: grid; gap: 12px; }
