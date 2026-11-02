@@ -102,6 +102,55 @@ async function loadPlaces() {
   try { return await (await fetch('places.json')).json(); } catch { return []; }
 }
 
+let found = [];
+
+// Google Places (New) text search, limited to Singapore. Rating and price range put this in the
+// Enterprise tier, which has a small free monthly allowance, so it only runs when you tap Search.
+async function searchPlaces(q) {
+  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GMAPS_KEY,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceRange,places.priceLevel,places.primaryTypeDisplayName,places.googleMapsUri',
+    },
+    body: JSON.stringify({
+      textQuery: q, regionCode: 'SG', pageSize: 10,
+      locationRestriction: { rectangle: { low: { latitude: 1.15, longitude: 103.6 }, high: { latitude: 1.48, longitude: 104.1 } } },
+    }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error?.message || 'HTTP ' + res.status);
+  return (await res.json()).places || [];
+}
+
+const LEVEL_PRICE = { PRICE_LEVEL_FREE: 0, PRICE_LEVEL_INEXPENSIVE: 8, PRICE_LEVEL_MODERATE: 25, PRICE_LEVEL_EXPENSIVE: 60, PRICE_LEVEL_VERY_EXPENSIVE: 100 };
+function priceGuess(p) {
+  const lo = Number(p.priceRange?.startPrice?.units), hi = Number(p.priceRange?.endPrice?.units);
+  if (!isNaN(lo)) return isNaN(hi) ? lo : Math.round((lo + hi) / 2);
+  return LEVEL_PRICE[p.priceLevel] ?? '';
+}
+function prefill(p) {
+  return {
+    name: p.displayName?.text || '', area: '', cuisine: p.primaryTypeDisplayName?.text || '',
+    price: priceGuess(p), rating: p.rating ?? null,
+    notes: `Google ${p.rating ?? '?'} (${p.userRatingCount ?? 0} reviews). ${p.formattedAddress || ''}`.trim(),
+    lat: p.location?.latitude ?? '', lng: p.location?.longitude ?? '',
+  };
+}
+function foundCard(p, i) {
+  const pre = prefill(p), name = pre.name;
+  const price = pre.price === '' ? 'price unknown' : `about S$${pre.price}/pax`;
+  return `<article class="card found-card"><div class="body">
+    <h3>${esc(name)}</h3>
+    <div class="meta">${p.rating ? '★ ' + p.rating + ' (' + (p.userRatingCount || 0) + ') · ' : ''}${esc(pre.cuisine)}${pre.cuisine ? ' · ' : ''}${price}</div>
+    <div class="notes">${esc(p.formattedAddress)}</div>
+    <div class="foot"><button class="status" data-act="add" data-i="${i}">Add on this device</button>
+      <button class="status" data-act="copy" data-i="${i}">Copy row for Sheet</button>
+      <a href="${esc(p.googleMapsUri || '#')}" target="_blank" rel="noopener">Google Maps</a></div>
+    <details class="research"><summary>Research</summary><div class="rlinks">${researchLinks(name + ' Singapore')}</div></details>
+  </div></article>`;
+}
+
 // Search links for one place or any free-text idea. Instagram, TikTok and blogs go through Google
 // site: searches because they have no stable public search URLs of their own.
 const BLOGS = ['sethlui.com', 'ladyironchef.com', 'eatbook.sg', 'danielfooddiary.com', 'misstamchiak.com'];
@@ -217,10 +266,34 @@ async function init() {
   $('tab-map').onclick = () => showTab('map');
   $('btn-loadmap').onclick = startMap;
 
-  $('rform').addEventListener('submit', e => {
+  // "Search places" calls Google Places (one billable request per tap); "Research links" is free.
+  $('rform').addEventListener('submit', async e => {
     e.preventDefault();
     const q = $('rq').value.trim();
-    $('rlinks').innerHTML = q ? researchLinks(q) : '';
+    if (!q) return;
+    $('rlinks').innerHTML = researchLinks(q);
+    $('found').innerHTML = '<p class="meta">Searching…</p>';
+    try {
+      found = await searchPlaces(q);
+      $('found').innerHTML = found.length ? found.map(foundCard).join('') : '<p class="meta">No places found.</p>';
+    } catch (err) {
+      $('found').innerHTML = `<p class="meta">Search failed: ${esc(err.message)}. Check that Places API (New) is enabled and allowed on the API key.</p>`;
+    }
+  });
+
+  $('found').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    const p = found[b.dataset.i], pre = prefill(p);
+    if (b.dataset.act === 'copy') {
+      const row = ['', pre.name, pre.area, pre.cuisine, pre.price, pre.rating ?? '', '', pre.notes, '', pre.lat, pre.lng, 'want'];
+      try { await navigator.clipboard.writeText(row.join('\t')); b.textContent = 'Copied. Paste in a new Sheet row'; }
+      catch { b.textContent = 'Copy failed'; }
+    } else {
+      const f = $('form').elements;
+      ['name', 'area', 'cuisine', 'price', 'notes', 'lat', 'lng'].forEach(k => { f[k].value = pre[k] ?? ''; });
+      $('dlg').showModal();
+    }
   });
 
   const root = document.documentElement;
